@@ -8,23 +8,23 @@ from setuptools import setup, find_packages
 
 import kt_simul
 
-install_requires = ['cython', 'numpy', 'numexpr',
-                    'tables', 'pandas', 'matplotlib', 'pytest']
+# install_requires = ['cython', 'numpy', 'numexpr',
+#                     'tables', 'pandas', 'matplotlib', 'pytest']
 
-def install_requirements(install_requires):
-    """
-    Install third party libs in right order.
-    """
-    import subprocess
-    import pip
+# def install_requirements(install_requires):
+#     """
+#     Install third party libs in right order.
+#     """
+#     import subprocess
+#     import pip
+#
+#     for package in install_requires:
+#         try:
+#             __import__(package)
+#         except:
+#             pip.main(['install', package])
 
-    for package in install_requires:
-        try:
-            __import__(package)
-        except:
-            pip.main(['install', package])
-
-install_requirements(install_requires)
+# install_requirements(install_requires)
 
 from Cython.Distutils import build_ext
 from Cython.Build import cythonize
@@ -38,7 +38,7 @@ setup(
     description="""Python model of chromosome mouvements during mitosis in
                    Fission Yeast""",
     long_description=open('README.md').read(),
-    install_requires=install_requires,
+    # install_requires=install_requires,
     include_package_data=True,
     url='https://github.com/bnoi/kt_simul.git',
     classifiers=[
