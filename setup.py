@@ -9,7 +9,7 @@ from setuptools import setup, find_packages
 import kt_simul
 
 install_requires = ['cython', 'numpy', 'numexpr',
-                    'tables', 'pandas', 'matplotlib']
+                    'tables', 'pandas', 'matplotlib', 'pytest']
 
 def install_requirements(install_requires):
     """

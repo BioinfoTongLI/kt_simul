@@ -110,3 +110,10 @@ class ParamTree(object):
         """
         """
         return ParamTree(df=self.params.copy(), adimentionalized=self.adimentionalized)
+
+    def to_csv(self, path):
+        """
+
+        :param path:
+        """
+        self.params.to_csv(path)
