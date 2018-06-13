@@ -75,6 +75,7 @@ class Metaphase(object):
     def __init__(self,  paramtree=None, measuretree=None,
                  initial_plug='random', verbose=False,
                  keep_same_random_seed=False,
+                 prng=None,
                  force_parameters=[]):
 
         # Enable or disable log console
@@ -100,7 +101,9 @@ class Metaphase(object):
 
         log.info('Parameters loaded')
 
-        if keep_same_random_seed:
+        if prng is not None:
+            self.prng = prng
+        elif keep_same_random_seed:
             self.prng = self.__class__.get_random_state()
         else:
             self.prng = np.random.RandomState()

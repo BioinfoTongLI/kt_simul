@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
 import sys
+
+from kt_simul.core.simul_spindle import Metaphase
+from kt_simul.io.simuio import SimuIO
+
 sys.path.append("../kt_simul")
 from kt_simul.core import parameters
 import numpy as np
@@ -92,43 +96,61 @@ class TestParameterProcessing:
         teardown_log(TestParameterProcessing)
 
 
-class TestKD:
+class TestMetaphase:
 
     # TEST_KD_DATA = [
     #     [1, 22.222, 50.00, 222.222, 600, 0.1, 0.02, 26.3888]
     # ]
     PARAM_TREE = None
     MEASURE_TREE = None
-    PARAMS_FOR_KD = None
     logger = logging.getLogger(__name__)
     logging.basicConfig(level=logging.INFO)
+    SPAN = 50
 
     @classmethod
     def setup_class(cls):
         cls.PARAM_TREE = parameters.get_default_paramtree()
+        cls.PARAM_TREE['span'] = cls.SPAN
         cls.MEASURE_TREE = parameters.get_default_measuretree()
 
         parameters.reduce_params(cls.PARAM_TREE, cls.MEASURE_TREE,
                                  force_parameters=[])
-        cls.PARAMS_FOR_KD = cls.PARAM_TREE.relative_dic
-        # Reset explicitely the unit parameters to their
-        # dimentionalized value
-        cls.PARAMS_FOR_KD['Vk'] = cls.PARAM_TREE.absolute_dic['Vk']
-        cls.PARAMS_FOR_KD['Fk'] = cls.PARAM_TREE.absolute_dic['Fk']
-        cls.PARAMS_FOR_KD['dt'] = cls.PARAM_TREE.absolute_dic['dt']
 
-    # def test_kd(self):
-    #     self.KD = KinetoDynamics(TestKD.PARAMS_FOR_KD, initial_plug='random')
-    #     self.KD.anaphase = False
-    #     # self.logger.info(""+str(self.KD.spindle))
-    #     # self.logger.info("" + str(TestKD.METAPHASE.KD.all_plugsites))
+    def test_metaphase(self):
+        random_state = np.random.RandomState(2230)
+        # These two lines are required to launch more than one simulation in a single run in a for loop for example
+        # state = randomState.get_state()
+        # randomState.set_state(state)
 
-    # def test_simul(self):
-    #     TestKD.METAPHASE.simul()
+        meta = Metaphase(verbose=True, paramtree=TestMetaphase.PARAM_TREE, measuretree=TestMetaphase.MEASURE_TREE,
+                         prng=random_state,
+                         initial_plug='random')
+        meta.simul()
+
+        run_id = 1
+
+        SimuIO(meta).save("%s_steps_%s.h5" % (TestMetaphase.SPAN, run_id))
+
+        meta.show().savefig("%s_traj%i.png" % (TestMetaphase.SPAN, run_id))
+
+    # def test_solve(self):
+    #     """
+    #         This is the core to be tested
+    #     :return:
+    #     """
+    #     # cdef solve(self):
+    #     # cdef np.ndarray[DTYPE_t, ndim = 1] X, C, pos_dep
+    #     # cdef np.ndarray[DTYPE_t, ndim = 2] A, B
+    #     X = KD.get_state_vector()
+    #     A = KD.calc_A()
+    #     B = KD.B_mat
+    #     C = KD.calc_C()
+    #     pos_dep = np.dot(B, X) + C
+    #     KD.speeds = np.linalg.solve(A, -pos_dep)
+        
 
     @classmethod
     def teardown_class(cls):
-        TestKD.PARAM_TREE = None
-        TestKD.MEASURE_TREE = None
-        # TestKD.TEST_KD_DATA = None
-        teardown_log(TestKD)
+        TestMetaphase.PARAM_TREE = None
+        TestMetaphase.MEASURE_TREE = None
+        teardown_log(TestMetaphase)
