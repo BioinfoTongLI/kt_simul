@@ -1,27 +1,37 @@
 # -*- coding: utf-8 -*-
 import sys
-
-from kt_simul.core.simul_spindle import Metaphase
-from kt_simul.io.simuio import SimuIO
-
-sys.path.append("../kt_simul")
-from kt_simul.core import parameters
 import numpy as np
 import pandas as pd
 import pytest
-import pyximport
 import logging
+from kt_simul.core.simul_spindle import Metaphase
+from kt_simul.io.simuio import SimuIO
+sys.path.append("../kt_simul")
+from kt_simul.core import parameters
+import pyximport
 pyximport.install(setup_args={'include_dirs': np.get_include()}, reload_support=True)
-from kt_simul.core.spindle_dynamics import KinetoDynamics
 
 
 def get_diffs(df1, df2):
-    d1 = df1.sort_index(axis=1)
-    d2 = df2.sort_index(axis=1)
-    idx = np.where(d1 != d2)
-    changed_from = d1.values[idx]
-    changed_to = d2.values[idx]
-    return pd.DataFrame({'from': changed_from, 'to': changed_to})
+    df1 = df1.reindex(sorted(df1.columns), axis=1)
+    df2 = df2.reindex(sorted(df2.columns), axis=1)
+    assert (df1.columns == df2.columns).all(), \
+        "DataFrame column names are different"
+    if any(df1.dtypes != df2.dtypes):
+        "Data Types are different, trying to convert"
+        df2 = df2.astype(df1.dtypes)
+    if df1.equals(df2):
+        return None
+    else:
+        d1 = df1.sort_index(axis=1)
+        d2 = df2.sort_index(axis=1)
+        idx = np.where(d1 != d2)
+        changed_from = d1.values[idx]
+        changed_to = d2.values[idx]
+        new_idx = []
+        for x in zip(idx[0],idx[1]):
+            new_idx.append(x)
+        return pd.DataFrame({'from': changed_from, 'to': changed_to}, index=new_idx)
 
 
 def assertion(param_tree, name, expected_value, precision=0.001):
@@ -46,18 +56,19 @@ class TestParameterProcessing:
     logger = logging.getLogger(__name__)
     logging.basicConfig(level=logging.INFO)
 
-    @classmethod
-    def setup_class(cls):
-        cls.PARAM_TREE = parameters.get_default_paramtree()
-        cls.MEASURE_TREE = parameters.get_default_measuretree()
+    def test_parameter_loading(self):
+        TestParameterProcessing.PARAM_TREE = parameters.get_default_paramtree()
+        assert TestParameterProcessing.PARAM_TREE.params.shape == (31, 7)
+        TestParameterProcessing.MEASURE_TREE = parameters.get_default_measuretree()
+        assert TestParameterProcessing.MEASURE_TREE.params.shape == (12, 7)
 
     def test_mk_related_params(self):
         """
         Verify that only 7 parameters will be changed when calling parameters.reduce_params
         """
-        param_tree = TestParameterProcessing.PARAM_TREE.copy()
+        param_tree = self.PARAM_TREE.copy()
         before = param_tree.params
-        parameters.reduce_params(param_tree, TestParameterProcessing.MEASURE_TREE)
+        parameters.reduce_params(param_tree, self.MEASURE_TREE)
         after = param_tree.params
         assert get_diffs(before, after).shape == (7, 2)
 
@@ -74,10 +85,10 @@ class TestParameterProcessing:
         25, Fmz,        Midzone stall Force
         """
 
-        param_tree = TestParameterProcessing.PARAM_TREE.copy()
+        param_tree = self.PARAM_TREE.copy()
         param_tree['Mk'] = mk
 
-        parameters.reduce_params(param_tree, TestParameterProcessing.MEASURE_TREE)
+        parameters.reduce_params(param_tree, self.MEASURE_TREE)
         # param_tree.to_csv("test/%i.csv" % mk)
         assertion(param_tree, "kappa_c", exp_kappa_c)
         assertion(param_tree, "kappa_k", exp_kappa_k)
@@ -98,14 +109,16 @@ class TestParameterProcessing:
 
 class TestMetaphase:
 
-    # TEST_KD_DATA = [
-    #     [1, 22.222, 50.00, 222.222, 600, 0.1, 0.02, 26.3888]
-    # ]
     PARAM_TREE = None
     MEASURE_TREE = None
     logger = logging.getLogger(__name__)
     logging.basicConfig(level=logging.INFO)
-    SPAN = 50
+    SPAN = 1000
+    ID = 0
+    h5_path = "data/%s_steps_%s.h5" % (SPAN, ID)
+    fig_path = "data/%s_traj_%i.png" % (SPAN, ID)
+    ref_path = "data/ref_1000_steps_0.h5"
+    df_names = ["analysis", "measures", "params", "kts", "spbs", "plug_sites"]
 
     @classmethod
     def setup_class(cls):
@@ -115,8 +128,6 @@ class TestMetaphase:
 
         parameters.reduce_params(cls.PARAM_TREE, cls.MEASURE_TREE,
                                  force_parameters=[])
-
-    def test_metaphase(self):
         random_state = np.random.RandomState(2230)
         # These two lines are required to launch more than one simulation in a single run in a for loop for example
         # state = randomState.get_state()
@@ -127,15 +138,20 @@ class TestMetaphase:
                          initial_plug='random')
         meta.simul()
 
-        run_id = 1
+        SimuIO(meta).save(TestMetaphase.h5_path)
 
-        SimuIO(meta).save("%s_steps_%s.h5" % (TestMetaphase.SPAN, run_id))
+        meta.show().savefig(TestMetaphase.fig_path)
 
-        meta.show().savefig("%s_traj%i.png" % (TestMetaphase.SPAN, run_id))
+    def test_identical_to_ref(self):
+        for name in TestMetaphase.df_names[1:]:
+            df = pd.read_hdf(TestMetaphase.h5_path, name)
+            ref_df = pd.read_hdf(TestMetaphase.ref_path, name)
+            diffs = get_diffs(ref_df, df)
+            assert diffs is None, (name, diffs.shape, diffs)
 
     # def test_solve(self):
     #     """
-    #         This is the core to be tested
+    #         This is the core to be tested, for a much deeper test
     #     :return:
     #     """
     #     # cdef solve(self):
@@ -153,4 +169,5 @@ class TestMetaphase:
     def teardown_class(cls):
         TestMetaphase.PARAM_TREE = None
         TestMetaphase.MEASURE_TREE = None
+        TestMetaphase.SPAN = None
         teardown_log(TestMetaphase)
